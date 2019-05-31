@@ -41,7 +41,6 @@ impl Droplet {
         if self.mag <= 1 {
             None
         } else if global_ctr % (self.ripple_freq as u64) == 0 {
-            dbg!();
             Some(Droplet {
                 mag: self.mag - 1,
                 ..*self
@@ -167,7 +166,10 @@ impl Pond {
         let mut new_droplets = Vec::with_capacity(self.droplets.len());
         let ctr = self.counter;
         for droplet in &self.droplets {
-            self.ripples.add_ripple(droplet);
+            if ctr % (droplet.ripple_freq as u64) == 0 {
+                self.ripples.add_ripple(droplet);
+            }
+            // TODO refactor out of this method
             if let Some(new_droplet) = droplet.lose_energy(ctr) {
                 new_droplets.push(new_droplet);
             }
