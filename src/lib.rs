@@ -137,28 +137,23 @@ impl Pond {
             }
         }
         // Add fresh ripples, and remove dead droplets at the same time
-        let mut new_droplets = Vec::with_capacity(self.droplets.len());
-        for droplet in &self.droplets {
-            let new_droplet: Droplet;
+        let droplets = &mut self.droplets;
+        let mut j = 0;
+        while j != droplets.len() {
+            let mut droplet = &mut droplets[j];
             let ripple_ctr = droplet.ripple_ctr;
             if ripple_ctr == 0 {
-                self.ripples.add_ripple(droplet);
-                new_droplet = Droplet {
-                    mag: droplet.mag - 1,
-                    ripple_ctr: droplet.ripple_freq,
-                    ..*droplet
-                };
+                self.ripples.add_ripple(&droplet);
+                droplet.mag = droplet.mag - 1;
+                droplet.ripple_ctr = droplet.ripple_freq;
+                j += 1;
             } else if droplet.mag > 1 {
-                new_droplet = Droplet {
-                    ripple_ctr: ripple_ctr - 1,
-                    ..*droplet
-                }
+                droplet.ripple_ctr = ripple_ctr - 1;
+                j += 1;
             } else {
-                continue;
+                droplets.remove(j);
             }
-            new_droplets.push(new_droplet);
         }
-        self.droplets = new_droplets;
     }
 
     pub fn add_droplet(&mut self, x: u16, y: u16, mag: u16, color: u32, freq: u16) {
