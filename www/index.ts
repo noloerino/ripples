@@ -1,5 +1,5 @@
 import { Pond, init } from "ripples";
-import { memory } from "ripples/ripples_bg"
+import { memory } from "ripples/ripples_bg";
 
 init();
 
@@ -11,7 +11,7 @@ const GLOBAL_ALPHA_SCALE_NUMER = 3;
 const GLOBAL_ALPHA_SCALE_DENOM = 5;
 
 const pond = Pond.new(WIDTH, HEIGHT);
-const canvas = document.getElementById("pond-canvas");
+const canvas = <HTMLCanvasElement> document.getElementById("pond-canvas");
 canvas.height = HEIGHT;
 canvas.width = WIDTH;
 
@@ -28,7 +28,7 @@ let currMagnitude = 200;
 let currFreq = 50;
 
 let mouseDown = false;
-const addDroplet = (e) => {
+const addDroplet = (e: MouseEvent) => {
     if (mouseDown) {
         currColor = Math.trunc(Math.random() * 0xFFFFFF);
         currFreq = Math.random() * 50 + 20;
@@ -47,7 +47,11 @@ const drawPond = () => {
         pond.ripple_colors(),
     ];
     const rippleCount = pond.ripple_count();
-    const [xs, ys, mags, max_mags, colors] = ptrs.map(ptr => new Uint32Array(memory.buffer, ptr, rippleCount));
+    const xs = new Uint16Array(memory.buffer, pond.ripple_xs(), rippleCount);
+    const ys = new Uint16Array(memory.buffer, pond.ripple_ys(), rippleCount);
+    const mags = new Uint16Array(memory.buffer, pond.ripple_mags(), rippleCount);
+    const max_mags = new Uint16Array(memory.buffer, pond.ripple_max_mags(), rippleCount);
+    const colors = new Uint32Array(memory.buffer, pond.ripple_colors(), rippleCount);
     for (let i = 0; i < xs.length; i++) {
         let color = (colors[i] & 0xFFFFFF);
         let r = (color >> 16) & 0xFF;
@@ -72,9 +76,12 @@ const drawPond = () => {
     }
 };
 
-canvas.addEventListener("mousedown", (e) => mouseDown = e.button === 0);
+canvas.addEventListener("mousedown", (e) => {
+    mouseDown = e.button === 0;
+    addDroplet(e);
+});
 canvas.addEventListener("mousemove", addDroplet);
-canvas.addEventListener("mouseup", (e) => mouseDown = mouseDown & !(e.button === 0));
+canvas.addEventListener("mouseup", (e) => mouseDown = mouseDown && !(e.button === 0));
 
 drawPond();
 requestAnimationFrame(renderLoop);

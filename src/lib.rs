@@ -17,6 +17,11 @@ macro_rules! log {
     }
 }
 
+type Coordinate = u16;
+type DropletStrength = u16;
+type Color = u32;
+type RippleCtr = u16;
+
 /// A `Droplet` is the source of ripples, i.e. when a click occurs,
 /// a new source of ripples should appear and then fade away after
 /// a certain amount of time.
@@ -24,16 +29,16 @@ macro_rules! log {
 #[derive(Debug)]
 #[derive(Clone)]
 struct Droplet {
-    x: u32,
-    y: u32,
+    x: Coordinate,
+    y: Coordinate,
     /// The strength of the droplet, i.e. the radius of the first and larget ripple
-    mag: u32,
+    mag: DropletStrength,
     /// The RGB hex code of this droplet (only the lower 24 bits are used)
-    color: u32,
+    color: Color,
     /// The number of iterations that pass before a new ripple is generated
-    ripple_freq: u32,
+    ripple_freq: RippleCtr,
     /// A counter counting down from ripple_freq to 0, to determine when the next ripple is made
-    ripple_ctr: u32,
+    ripple_ctr: RippleCtr,
 }
 
 /// A "ripple" is a ripple of water that is created by a droplet.
@@ -44,13 +49,13 @@ struct Droplet {
 /// `Droplet`s are iterated over for both removal and updating new ripples, they
 /// are left as an independent struct.
 struct Ripples {
-    xs: Vec<u32>,
-    ys: Vec<u32>,
+    xs: Vec<Coordinate>,
+    ys: Vec<Coordinate>,
     /// The current radius of each ripple
-    mags: Vec<u32>,
+    mags: Vec<DropletStrength>,
     /// The maximum radius of a given ripple.
-    max_mags: Vec<u32>,
-    colors: Vec<u32>,
+    max_mags: Vec<DropletStrength>,
+    colors: Vec<Color>,
 }
 
 const RIPPLE_START_CAP: usize = 1024;
@@ -85,8 +90,8 @@ impl Ripples {
 /// A `Pond` contains all the active droplets and ripples.
 #[wasm_bindgen]
 pub struct Pond {
-    width: u32,
-    height: u32,
+    width: Coordinate,
+    height: Coordinate,
     // No ECS for Droplets for now :(
     droplets: Vec<Droplet>,
     ripples: Ripples,
@@ -96,7 +101,7 @@ const DROPLET_START_CAP: usize = 128;
 
 #[wasm_bindgen]
 impl Pond {
-    pub fn new(width: u32, height: u32) -> Pond {
+    pub fn new(width: Coordinate, height: Coordinate) -> Pond {
         Pond {
             width,
             height,
@@ -156,7 +161,7 @@ impl Pond {
         self.droplets = new_droplets;
     }
 
-    pub fn add_droplet(&mut self, x: u32, y: u32, mag: u32, color: u32, freq: u32) {
+    pub fn add_droplet(&mut self, x: u16, y: u16, mag: u16, color: u32, freq: u16) {
         if x >= self.width || y >= self.height || mag == 0 {
             return;
         }
@@ -176,23 +181,23 @@ impl Pond {
     }
 
     /// Returns a pointer to the x coordinates
-    pub fn ripple_xs(&self) -> *const u32 {
+    pub fn ripple_xs(&self) -> *const Coordinate {
         self.ripples.xs.as_ptr()
     }
 
-    pub fn ripple_ys(&self) -> *const u32 {
+    pub fn ripple_ys(&self) -> *const Coordinate {
         self.ripples.ys.as_ptr()
     }
 
-    pub fn ripple_mags(&self) -> *const u32 {
+    pub fn ripple_mags(&self) -> *const DropletStrength {
         self.ripples.mags.as_ptr()
     }
 
-    pub fn ripple_max_mags(&self) -> *const u32 {
+    pub fn ripple_max_mags(&self) -> *const DropletStrength {
         self.ripples.max_mags.as_ptr()
     }
 
-    pub fn ripple_colors(&self) -> *const u32 {
+    pub fn ripple_colors(&self) -> *const Color {
         self.ripples.colors.as_ptr()
     }
 }
