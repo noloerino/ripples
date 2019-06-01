@@ -36,25 +36,6 @@ struct Droplet {
     ripple_ctr: u32,
 }
 
-impl Droplet {
-    /// The number of cycles left in the lifetime of this `Droplet`, assuming the global
-    /// pond counter is currently at 0.
-    //
-    // A droplet of magnitude 2 and ripple_freq 3 lasts for 1 cycle if the counter starts at 0
-    // ..............
-    // 1x
-    // A droplet of magnitude 3 and ripple_freq 2 lasts for 5 cycles if the counter starts at 0
-    // 3221x
-    /// The general formula is mag * (ripple_freq - 1) + 1
-    /// A droplet spends ripple_freq cycles at any given energy level; the droplet is
-    /// dropped after one cycle at energy level of 1 so we subtract 1 from mag and
-    /// add one back.
-    #[cfg(test)]
-    pub fn exp_lifetime(&self) -> u64 {
-        ((self.mag - 1) * self.ripple_freq + 1) as u64
-    }
-}
-
 /// A "ripple" is a ripple of water that is created by a droplet.
 /// These are what are rendered.
 /// A ripple is removed when its radius reaches its maximum radius.
@@ -72,14 +53,15 @@ struct Ripples {
     colors: Vec<u32>,
 }
 
+const RIPPLE_START_CAP: usize = 1024;
 impl Ripples {
     pub fn new() -> Ripples {
         Ripples {
-            xs: Vec::new(),
-            ys: Vec::new(),
-            mags: Vec::new(),
-            max_mags: Vec::new(),
-            colors: Vec::new(),
+            xs: Vec::with_capacity(RIPPLE_START_CAP),
+            ys: Vec::with_capacity(RIPPLE_START_CAP),
+            mags: Vec::with_capacity(RIPPLE_START_CAP),
+            max_mags: Vec::with_capacity(RIPPLE_START_CAP),
+            colors: Vec::with_capacity(RIPPLE_START_CAP),
         }
     }
 
@@ -108,8 +90,9 @@ pub struct Pond {
     // No ECS for Droplets for now :(
     droplets: Vec<Droplet>,
     ripples: Ripples,
-    counter: u64,
 }
+
+const DROPLET_START_CAP: usize = 128;
 
 #[wasm_bindgen]
 impl Pond {
@@ -117,9 +100,8 @@ impl Pond {
         Pond {
             width,
             height,
-            droplets: Vec::new(),
+            droplets: Vec::with_capacity(DROPLET_START_CAP),
             ripples: Ripples::new(),
-            counter: 0u64,
         }
     }
 
@@ -133,28 +115,28 @@ impl Pond {
             max_mags,
             colors,
         } = &mut self.ripples;
-        // Need to increase magnitude by 1 if ripple is not dead
-        let mut mags_copy: Vec<u32> = mags.iter().map(|m| m + 1).collect();
         let mut i = 0;
-        while i != mags_copy.len() {
-            if mags_copy[i] > max_mags[i] {
+        while i != mags.len() {
+            // Need to increase magnitude by 1 if ripple is not dead
+            let mag = mags[i] + 1;
+            if mag > max_mags[i] {
                 // Remove inert ripples
                 xs.remove(i);
                 ys.remove(i);
-                // Note that mags_copy is referenced here, since this is what's new
-                mags_copy.remove(i);
+                mags.remove(i);
                 max_mags.remove(i);
                 colors.remove(i);
             } else {
+                mags[i] = mag;
                 i += 1;
             }
         }
-        self.ripples.mags = mags_copy;
         // Add fresh ripples, and remove dead droplets at the same time
         let mut new_droplets = Vec::with_capacity(self.droplets.len());
         for droplet in &self.droplets {
             let new_droplet: Droplet;
-            if droplet.ripple_ctr == 0 {
+            let ripple_ctr = droplet.ripple_ctr;
+            if ripple_ctr == 0 {
                 self.ripples.add_ripple(droplet);
                 new_droplet = Droplet {
                     mag: droplet.mag - 1,
@@ -163,7 +145,7 @@ impl Pond {
                 };
             } else if droplet.mag > 1 {
                 new_droplet = Droplet {
-                    ripple_ctr: droplet.ripple_ctr - 1,
+                    ripple_ctr: ripple_ctr - 1,
                     ..*droplet
                 }
             } else {
@@ -172,18 +154,6 @@ impl Pond {
             new_droplets.push(new_droplet);
         }
         self.droplets = new_droplets;
-        self.counter += 1;
-    }
-
-    #[cfg(test)]
-    fn add_test_droplet(&mut self, droplet: &Droplet) {
-        self.add_droplet(
-            droplet.x,
-            droplet.y,
-            droplet.mag,
-            droplet.color,
-            droplet.ripple_freq,
-        );
     }
 
     pub fn add_droplet(&mut self, x: u32, y: u32, mag: u32, color: u32, freq: u32) {

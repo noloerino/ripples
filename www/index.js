@@ -54,15 +54,16 @@ const drawPond = () => {
         let g = (color >> 8) & 0xFF;
         let b = color & 0xFF;
         let max_mag = max_mags[i];
+        let mag = mags[i];
         // We scale by integers rather than a floating point scalar for efficiency
-        let a = ((max_mag - mags[i]) * GLOBAL_ALPHA_SCALE_NUMER) / (max_mag * GLOBAL_ALPHA_SCALE_DENOM);
+        let a = ((max_mag - mag) * GLOBAL_ALPHA_SCALE_NUMER) / (max_mag * GLOBAL_ALPHA_SCALE_DENOM);
         let colorStr = `rgba(${r},${g},${b},${a})`;
         ctx.fillStyle = colorStr;
         ctx.beginPath();
         ctx.arc(
             xs[i],
             ys[i],
-            mags[i],
+            mag,
             0,
             2 * Math.PI,
             false
