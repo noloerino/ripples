@@ -17,12 +17,12 @@ macro_rules! log {
     }
 }
 
-
 /// A `Droplet` is the source of ripples, i.e. when a click occurs,
 /// a new source of ripples should appear and then fade away after
 /// a certain amount of time.
 /// A `Droplet` is removed when its magnitude reaches 0.
 #[derive(Debug)]
+#[derive(Clone)]
 struct Droplet {
     x: u32,
     y: u32,
@@ -32,24 +32,11 @@ struct Droplet {
     color: u32,
     /// The number of iterations that pass before a new ripple is generated
     ripple_freq: u32,
+    /// A counter counting down from ripple_freq to 0, to determine when the next ripple is made
+    ripple_ctr: u32,
 }
 
 impl Droplet {
-    /// Generates a `Droplet` of 1 less energy if `global_ctr % ripple_freq` is `0`.
-    /// If this `Droplet` already has 0 energy, then it drops itself and returns `None`.
-    pub fn lose_energy(&self, global_ctr: u64) -> Option<Droplet> {
-        if self.mag <= 1 {
-            None
-        } else if global_ctr % (self.ripple_freq as u64) == 0 {
-            Some(Droplet {
-                mag: self.mag - 1,
-                ..*self
-            })
-        } else {
-            Some(Droplet { ..*self })
-        }
-    }
-
     /// The number of cycles left in the lifetime of this `Droplet`, assuming the global
     /// pond counter is currently at 0.
     //
@@ -103,6 +90,7 @@ impl Ripples {
             mag,
             color,
             ripple_freq: _,
+            ripple_ctr: _,
         } = droplet;
         self.xs.push(x);
         self.ys.push(y);
@@ -164,15 +152,24 @@ impl Pond {
         self.ripples.mags = mags_copy;
         // Add fresh ripples, and remove dead droplets at the same time
         let mut new_droplets = Vec::with_capacity(self.droplets.len());
-        let ctr = self.counter;
         for droplet in &self.droplets {
-            if ctr % (droplet.ripple_freq as u64) == 0 {
+            let new_droplet: Droplet;
+            if droplet.ripple_ctr == 0 {
                 self.ripples.add_ripple(droplet);
+                new_droplet = Droplet {
+                    mag: droplet.mag - 1,
+                    ripple_ctr: droplet.ripple_freq,
+                    ..*droplet
+                };
+            } else if droplet.mag > 1 {
+                new_droplet = Droplet {
+                    ripple_ctr: droplet.ripple_ctr - 1,
+                    ..*droplet
+                }
+            } else {
+                continue;
             }
-            // TODO refactor out of this method
-            if let Some(new_droplet) = droplet.lose_energy(ctr) {
-                new_droplets.push(new_droplet);
-            }
+            new_droplets.push(new_droplet);
         }
         self.droplets = new_droplets;
         self.counter += 1;
@@ -200,6 +197,7 @@ impl Pond {
             mag,
             color,
             ripple_freq: freq,
+            ripple_ctr: 0,
         });
     }
 
@@ -232,44 +230,4 @@ impl Pond {
 #[wasm_bindgen]
 pub fn init() {
     utils::set_panic_hook();
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn single_droplet_dequeue_test(mag: u32, ripple_freq: u32) {
-        let mut pond = Pond::new(100, 100);
-        let droplet = Droplet {
-            x: 0,
-            y: 0,
-            mag,
-            color: 0xFFFF,
-            ripple_freq,
-        };
-        pond.add_test_droplet(&droplet);
-        let exp_lifetime = if mag == 1 {
-            1
-        } else {
-            // If we start on cycle 0, the magnitude is decremented after 1 cycle
-            droplet.exp_lifetime() - (ripple_freq as u64) + 1
-        };
-        while pond.droplets.len() > 0 {
-            pond.tick();
-        }
-        assert_eq!(
-            exp_lifetime, pond.counter,
-            "testing with mag={}, ripple_freq={}",
-            mag, ripple_freq
-        );
-    }
-
-    /// Make sure a droplet lasts for the appropriate number of cycles
-    #[test]
-    fn single_droplet_dequeue() {
-        single_droplet_dequeue_test(1, 2);
-        single_droplet_dequeue_test(2, 2);
-        single_droplet_dequeue_test(3, 7);
-        single_droplet_dequeue_test(5, 10);
-    }
 }

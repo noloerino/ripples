@@ -26,11 +26,14 @@ let currColor = 0x08FF; // TODO lift state
 let currMagnitude = 200;
 let currFreq = 50;
 
+let mouseDown = false;
 const addDroplet = (e) => {
-    currColor = Math.trunc(Math.random() * 0xFFFFFF);
-    currFreq = Math.random() * 50 + 20;
-    currMagnitude = Math.random() * 200 + 100;
-    pond.add_droplet(e.offsetX, e.offsetY, currMagnitude, currColor, currFreq);
+    if (mouseDown) {
+        currColor = Math.trunc(Math.random() * 0xFFFFFF);
+        currFreq = Math.random() * 50 + 20;
+        currMagnitude = Math.random() * 200 + 100;
+        pond.add_droplet(e.offsetX, e.offsetY, currMagnitude, currColor, currFreq);
+    }
 };
 
 const drawPond = () => {
@@ -66,7 +69,9 @@ const drawPond = () => {
     }
 };
 
-canvas.addEventListener("click", addDroplet);
+canvas.addEventListener("mousedown", (e) => mouseDown = e.button === 0);
+canvas.addEventListener("mousemove", addDroplet);
+canvas.addEventListener("mouseup", (e) => mouseDown = mouseDown & !(e.button === 0));
 
 drawPond();
 requestAnimationFrame(renderLoop);
