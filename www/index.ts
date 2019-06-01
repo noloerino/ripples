@@ -3,8 +3,8 @@ import { memory } from "ripples/ripples_bg";
 
 init();
 
-const HEIGHT = 1000;
-const WIDTH = 1000;
+const HEIGHT = window.innerHeight;
+const WIDTH = window.innerWidth;
 
 // Scales by 0.6, but reduces floating point ops in a tight loop
 const GLOBAL_ALPHA_SCALE_NUMER = 3;
