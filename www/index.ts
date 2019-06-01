@@ -53,7 +53,7 @@ const drawPond = () => {
     const max_mags = new Uint16Array(memory.buffer, pond.ripple_max_mags(), rippleCount);
     const colors = new Uint32Array(memory.buffer, pond.ripple_colors(), rippleCount);
     for (let i = 0; i < xs.length; i++) {
-        let color = (colors[i] & 0xFFFFFF);
+        let color = colors[i];
         let r = (color >> 16) & 0xFF;
         let g = (color >> 8) & 0xFF;
         let b = color & 0xFF;
