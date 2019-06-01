@@ -5,8 +5,10 @@ init();
 
 const HEIGHT = 1000;
 const WIDTH = 1000;
-// const GLOBAL_ALPHA = 0.3
-const GLOBAL_ALPHA_SCALE = 0.6;
+
+// Scales by 0.6, but reduces floating point ops in a tight loop
+const GLOBAL_ALPHA_SCALE_NUMER = 3;
+const GLOBAL_ALPHA_SCALE_DENOM = 5;
 
 const pond = Pond.new(WIDTH, HEIGHT);
 const canvas = document.getElementById("pond-canvas");
@@ -14,7 +16,6 @@ canvas.height = HEIGHT;
 canvas.width = WIDTH;
 
 const ctx = canvas.getContext("2d");
-// ctx.globalAlpha = GLOBAL_ALPHA;
 
 const renderLoop = () => {
     pond.tick();
@@ -49,11 +50,12 @@ const drawPond = () => {
     const [xs, ys, mags, max_mags, colors] = ptrs.map(ptr => new Uint32Array(memory.buffer, ptr, rippleCount));
     for (let i = 0; i < xs.length; i++) {
         let color = (colors[i] & 0xFFFFFF);
-        let scaleFactor = (1 - (mags[i] / max_mags[i]));
-        let r = Math.trunc((color >> 16)) & 0xFF;
-        let g = Math.trunc((color >> 8)) & 0xFF;
-        let b = Math.trunc((color)) & 0xFF;
-        let a = scaleFactor * GLOBAL_ALPHA_SCALE;
+        let r = (color >> 16) & 0xFF;
+        let g = (color >> 8) & 0xFF;
+        let b = color & 0xFF;
+        let max_mag = max_mags[i];
+        // We scale by integers rather than a floating point scalar for efficiency
+        let a = ((max_mag - mags[i]) * GLOBAL_ALPHA_SCALE_NUMER) / (max_mag * GLOBAL_ALPHA_SCALE_DENOM);
         let colorStr = `rgba(${r},${g},${b},${a})`;
         ctx.fillStyle = colorStr;
         ctx.beginPath();
