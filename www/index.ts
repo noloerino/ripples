@@ -37,42 +37,42 @@ const addDroplet = (e: MouseEvent) => {
     }
 };
 
+const TAU = 2 * Math.PI;
+
 const drawPond = () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const ptrs = [
-        pond.ripple_xs(),
-        pond.ripple_ys(),
-        pond.ripple_mags(),
-        pond.ripple_max_mags(),
-        pond.ripple_colors(),
-    ];
-    const rippleCount = pond.ripple_count();
-    const xs = new Uint16Array(memory.buffer, pond.ripple_xs(), rippleCount);
-    const ys = new Uint16Array(memory.buffer, pond.ripple_ys(), rippleCount);
-    const mags = new Uint16Array(memory.buffer, pond.ripple_mags(), rippleCount);
-    const max_mags = new Uint16Array(memory.buffer, pond.ripple_max_mags(), rippleCount);
-    const colors = new Uint32Array(memory.buffer, pond.ripple_colors(), rippleCount);
-    for (let i = 0; i < xs.length; i++) {
+    const dropletCount = pond.droplet_count();
+    const xs = new Uint16Array(memory.buffer, pond.droplet_xs(), dropletCount);
+    const ys = new Uint16Array(memory.buffer, pond.droplet_ys(), dropletCount);
+    const colors = new Uint32Array(memory.buffer, pond.droplet_colors(), dropletCount);
+    const rippleCounts = new Uint32Array(memory.buffer, pond.ripple_counts(), dropletCount);
+    for (let i = 0; i < dropletCount; i++) {
         let color = colors[i];
         let r = (color >> 16) & 0xFF;
         let g = (color >> 8) & 0xFF;
         let b = color & 0xFF;
-        let max_mag = max_mags[i];
-        let mag = mags[i];
-        // We scale by integers rather than a floating point scalar for efficiency
-        let a = ((max_mag - mag) * GLOBAL_ALPHA_SCALE_NUMER) / (max_mag * GLOBAL_ALPHA_SCALE_DENOM);
-        let colorStr = `rgba(${r},${g},${b},${a})`;
+        let rippleCount = rippleCounts[i];
+        let mags = new Uint16Array(memory.buffer, pond.ripple_mags(i), rippleCount);
+        let max_mags = new Uint16Array(memory.buffer, pond.ripple_max_mags(i), rippleCount);
+        let colorStr = `rgb(${r},${g},${b})`;
         ctx.fillStyle = colorStr;
-        ctx.beginPath();
-        ctx.arc(
-            xs[i],
-            ys[i],
-            mag,
-            0,
-            2 * Math.PI,
-            false
-        );
-        ctx.fill();
+        for (let j = 0; j < rippleCount; j++) {
+            let max_mag = max_mags[j];
+            let mag = mags[j];
+            // We scale by integers rather than a floating point scalar for efficiency
+            let a = ((max_mag - mag) * GLOBAL_ALPHA_SCALE_NUMER) / (max_mag * GLOBAL_ALPHA_SCALE_DENOM);
+            ctx.beginPath();
+            ctx.globalAlpha = a;
+            ctx.arc(
+                xs[i],
+                ys[i],
+                mag,
+                0,
+                TAU,
+                false
+            );
+            ctx.fill();
+        }
     }
 };
 

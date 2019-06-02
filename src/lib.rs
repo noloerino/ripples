@@ -8,7 +8,6 @@ use web_sys;
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
-
 // From the wasm game of life tutorial:
 // A macro to provide `println!(..)`-style syntax for `console.log` logging.
 macro_rules! log {
@@ -22,68 +21,46 @@ type DropletStrength = u16;
 type Color = u32;
 type RippleCtr = u16;
 
-/// A `Droplet` is the source of ripples, i.e. when a click occurs,
-/// a new source of ripples should appear and then fade away after
-/// a certain amount of time.
-/// A `Droplet` is removed when its magnitude reaches 0.
-#[derive(Debug)]
-#[derive(Clone)]
-struct Droplet {
-    x: Coordinate,
-    y: Coordinate,
-    /// The strength of the droplet, i.e. the radius of the first and larget ripple
-    mag: DropletStrength,
-    /// The RGB hex code of this droplet (only the lower 24 bits are used)
-    color: Color,
-    /// The number of iterations that pass before a new ripple is generated
-    ripple_freq: RippleCtr,
-    /// A counter counting down from ripple_freq to 0, to determine when the next ripple is made
-    ripple_ctr: RippleCtr,
-}
-
-/// A "ripple" is a ripple of water that is created by a droplet.
-/// These are what are rendered.
-/// A ripple is removed when its radius reaches its maximum radius.
-///
-/// Here, the "struct of vec" patterns is used for exposure to Javascript. Since
-/// `Droplet`s are iterated over for both removal and updating new ripples, they
-/// are left as an independent struct.
-struct Ripples {
+/// `Droplets` contains information about every droplet that has been dropped in the pond.
+/// The magnitude of each droplet fades away after a certain amount of time, and a droplet
+/// produces ripples at the frequency set by its associated ripple_freq
+struct Droplets {
     xs: Vec<Coordinate>,
     ys: Vec<Coordinate>,
-    /// The current radius of each ripple
-    mags: Vec<DropletStrength>,
-    /// The maximum radius of a given ripple.
-    max_mags: Vec<DropletStrength>,
+    /// The magnitude of the next generated ripple
+    next_mags: Vec<DropletStrength>,
+    /// The number of iterations that pass before a new ripple is generated
+    ripple_freqs: Vec<RippleCtr>,
+    /// A counter counting down from ripple_freq to 0, to determine when the next ripple is made
+    ripple_ctrs: Vec<RippleCtr>,
+    /// The RGB of a color (only the lower 24 bits are used)
     colors: Vec<Color>,
+    /// The magnitudes of the children ripples
+    /// Though the access pattern on the inner vector would seem to be conducive to a `VecDeque`,
+    /// the fact that its contents are exposed to wasm requires coercion to a pointer, hence
+    /// necessitating a `Vec`.
+    ripple_mags: Vec<Vec<DropletStrength>>,
+    ripple_max_mags: Vec<Vec<DropletStrength>>,
+    /// The length of each corresponding ripple vec (u32 not usize for wasm)
+    ripple_counts: Vec<u32>,
 }
 
+const DROPLET_START_CAP: usize = 128;
 const RIPPLE_START_CAP: usize = 1024;
-impl Ripples {
-    pub fn new() -> Ripples {
-        Ripples {
-            xs: Vec::with_capacity(RIPPLE_START_CAP),
-            ys: Vec::with_capacity(RIPPLE_START_CAP),
-            mags: Vec::with_capacity(RIPPLE_START_CAP),
-            max_mags: Vec::with_capacity(RIPPLE_START_CAP),
-            colors: Vec::with_capacity(RIPPLE_START_CAP),
-        }
-    }
 
-    pub fn add_ripple(&mut self, droplet: &Droplet) {
-        let &Droplet {
-            x,
-            y,
-            mag,
-            color,
-            ripple_freq: _,
-            ripple_ctr: _,
-        } = droplet;
-        self.xs.push(x);
-        self.ys.push(y);
-        self.mags.push(0);
-        self.max_mags.push(mag);
-        self.colors.push(color);
+impl Droplets {
+    pub fn new() -> Droplets {
+        Droplets {
+            xs: Vec::with_capacity(DROPLET_START_CAP),
+            ys: Vec::with_capacity(DROPLET_START_CAP),
+            next_mags: Vec::with_capacity(DROPLET_START_CAP),
+            ripple_freqs: Vec::with_capacity(DROPLET_START_CAP),
+            ripple_ctrs: Vec::with_capacity(DROPLET_START_CAP),
+            colors: Vec::with_capacity(DROPLET_START_CAP),
+            ripple_mags: Vec::with_capacity(DROPLET_START_CAP),
+            ripple_max_mags: Vec::with_capacity(DROPLET_START_CAP),
+            ripple_counts: Vec::with_capacity(DROPLET_START_CAP),
+        }
     }
 }
 
@@ -92,12 +69,8 @@ impl Ripples {
 pub struct Pond {
     width: Coordinate,
     height: Coordinate,
-    // No ECS for Droplets for now :(
-    droplets: Vec<Droplet>,
-    ripples: Ripples,
+    droplets: Droplets,
 }
-
-const DROPLET_START_CAP: usize = 128;
 
 #[wasm_bindgen]
 impl Pond {
@@ -105,95 +78,137 @@ impl Pond {
         Pond {
             width,
             height,
-            droplets: Vec::with_capacity(DROPLET_START_CAP),
-            ripples: Ripples::new(),
+            droplets: Droplets::new(),
         }
     }
 
     /// Updates the pond by generating new ripples, and removing olds ripples
     /// and droplets that have run out of inertia.
     pub fn tick(&mut self) {
-        let Ripples {
+        // Add fresh ripples, and remove dead droplets at the same time
+        let Droplets {
             xs,
             ys,
-            mags,
-            max_mags,
+            next_mags,
+            ripple_freqs,
+            ripple_ctrs,
             colors,
-        } = &mut self.ripples;
-        let mut i = 0;
-        while i != mags.len() {
-            // Need to increase magnitude by 1 if ripple is not dead
-            let mag = mags[i] + 1;
-            if mag > max_mags[i] {
-                // Remove inert ripples
-                xs.remove(i);
-                ys.remove(i);
-                mags.remove(i);
-                max_mags.remove(i);
-                colors.remove(i);
-            } else {
-                mags[i] = mag;
-                i += 1;
+            ripple_mags,
+            ripple_max_mags,
+            ripple_counts,
+        } = &mut self.droplets;
+        let mut droplet_id = 0;
+        while droplet_id != xs.len() {
+            // Since we're not using any fancy IDs for droplets, it doesn't matter
+            // that we'll visit the same id multiple times (since droplets shift along
+            // with the indices)
+            let mags = &mut ripple_mags[droplet_id];
+            let max_mags = &mut ripple_max_mags[droplet_id];
+            let mut new_count = ripple_counts[droplet_id];
+            let mut i = 0;
+            // Remove or update existing ripples
+            while i != mags.len() {
+                // Need to increase magnitude by 1 if ripple is not dead
+                let mag = mags[i] + 1;
+                if mag > max_mags[i] {
+                    // Remove inert ripples
+                    mags.remove(i);
+                    max_mags.remove(i);
+                    new_count -= 1;
+                } else {
+                    mags[i] = mag;
+                    i += 1;
+                }
             }
-        }
-        // Add fresh ripples, and remove dead droplets at the same time
-        let droplets = &mut self.droplets;
-        let mut j = 0;
-        while j != droplets.len() {
-            let mut droplet = &mut droplets[j];
-            let ripple_ctr = droplet.ripple_ctr;
+            // Update droplet livelihood
+            let ripple_ctr = ripple_ctrs[droplet_id];
+            let next_new_mag = next_mags[droplet_id];
             if ripple_ctr == 0 {
-                self.ripples.add_ripple(&droplet);
-                droplet.mag = droplet.mag - 1;
-                droplet.ripple_ctr = droplet.ripple_freq;
-                j += 1;
-            } else if droplet.mag > 1 {
-                droplet.ripple_ctr = ripple_ctr - 1;
-                j += 1;
+                // Create new ripple
+                mags.push(0);
+                max_mags.push(next_new_mag);
+                next_mags[droplet_id] = next_new_mag - 1;
+                ripple_ctrs[droplet_id] = ripple_freqs[droplet_id];
+                ripple_counts[droplet_id] = new_count + 1;
+                droplet_id += 1;
+            } else if next_new_mag > 1 {
+                ripple_counts[droplet_id] = new_count;
+                ripple_ctrs[droplet_id] = ripple_ctr - 1;
+                droplet_id += 1;
             } else {
-                droplets.remove(j);
+                xs.remove(droplet_id);
+                ys.remove(droplet_id);
+                next_mags.remove(droplet_id);
+                ripple_freqs.remove(droplet_id);
+                ripple_ctrs.remove(droplet_id);
+                colors.remove(droplet_id);
+                ripple_mags.remove(droplet_id);
+                ripple_max_mags.remove(droplet_id);
+                ripple_counts.remove(droplet_id);
             }
         }
     }
 
-    pub fn add_droplet(&mut self, x: u16, y: u16, mag: u16, color: u32, freq: u16) {
+    pub fn add_droplet(
+        &mut self,
+        x: Coordinate,
+        y: Coordinate,
+        mag: DropletStrength,
+        color: Color,
+        freq: RippleCtr,
+    ) {
         if x >= self.width || y >= self.height || mag == 0 {
             return;
         }
-        let droplets = &mut self.droplets;
-        droplets.push(Droplet {
-            x,
-            y,
-            mag,
-            color,
-            ripple_freq: freq,
-            ripple_ctr: 0,
-        });
+        let Droplets {
+            xs,
+            ys,
+            next_mags,
+            ripple_freqs,
+            ripple_ctrs,
+            colors,
+            ripple_mags,
+            ripple_max_mags,
+            ripple_counts,
+        } = &mut self.droplets;
+        xs.push(x);
+        ys.push(y);
+        next_mags.push(mag);
+        ripple_freqs.push(freq);
+        ripple_ctrs.push(0);
+        colors.push(color);
+        ripple_mags.push(Vec::with_capacity(RIPPLE_START_CAP));
+        ripple_max_mags.push(Vec::with_capacity(RIPPLE_START_CAP));
+        ripple_counts.push(0);
     }
 
-    pub fn ripple_count(&self) -> usize {
-        self.ripples.xs.len()
+    pub fn droplet_count(&self) -> u32 {
+        // Seems unlikely that we'll overflow u32 into usize
+        self.droplets.xs.len() as u32
     }
 
-    /// Returns a pointer to the x coordinates
-    pub fn ripple_xs(&self) -> *const Coordinate {
-        self.ripples.xs.as_ptr()
+    pub fn droplet_xs(&self) -> *const Coordinate {
+        self.droplets.xs.as_ptr()
     }
 
-    pub fn ripple_ys(&self) -> *const Coordinate {
-        self.ripples.ys.as_ptr()
+    pub fn droplet_ys(&self) -> *const Coordinate {
+        self.droplets.ys.as_ptr()
     }
 
-    pub fn ripple_mags(&self) -> *const DropletStrength {
-        self.ripples.mags.as_ptr()
+    pub fn droplet_colors(&self) -> *const Color {
+        self.droplets.colors.as_ptr()
     }
 
-    pub fn ripple_max_mags(&self) -> *const DropletStrength {
-        self.ripples.max_mags.as_ptr()
+    pub fn ripple_mags(&self, droplet_id: usize) -> *const DropletStrength {
+        self.droplets.ripple_mags[droplet_id].as_ptr()
     }
 
-    pub fn ripple_colors(&self) -> *const Color {
-        self.ripples.colors.as_ptr()
+    pub fn ripple_max_mags(&self, droplet_id: usize) -> *const DropletStrength {
+        self.droplets.ripple_max_mags[droplet_id].as_ptr()
+    }
+
+    pub fn ripple_counts(&self) -> *const u32 {
+        self.droplets.ripple_counts.as_ptr()
     }
 }
 
