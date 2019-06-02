@@ -42,23 +42,26 @@ const TAU = 2 * Math.PI;
 const drawPond = () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const dropletCount = pond.droplet_count();
+    const rippleCount = pond.total_ripples();
     const xs = new Uint16Array(memory.buffer, pond.droplet_xs(), dropletCount);
     const ys = new Uint16Array(memory.buffer, pond.droplet_ys(), dropletCount);
     const colors = new Uint32Array(memory.buffer, pond.droplet_colors(), dropletCount);
     const rippleCounts = new Uint32Array(memory.buffer, pond.ripple_counts(), dropletCount);
+    let mags = new Uint16Array(memory.buffer, pond.ripple_mags(), rippleCount);
+    let max_mags = new Uint16Array(memory.buffer, pond.ripple_max_mags(), rippleCount);
+    let rippleId = 0;
     for (let i = 0; i < dropletCount; i++) {
         let color = colors[i];
         let r = (color >> 16) & 0xFF;
         let g = (color >> 8) & 0xFF;
         let b = color & 0xFF;
         let rippleCount = rippleCounts[i];
-        let mags = new Uint16Array(memory.buffer, pond.ripple_mags(i), rippleCount);
-        let max_mags = new Uint16Array(memory.buffer, pond.ripple_max_mags(i), rippleCount);
         let colorStr = `rgb(${r},${g},${b})`;
         ctx.fillStyle = colorStr;
-        for (let j = 0; j < rippleCount; j++) {
-            let max_mag = max_mags[j];
-            let mag = mags[j];
+        let nextBound = rippleId + rippleCount;
+        for (; rippleId < nextBound; rippleId++) {
+            let max_mag = max_mags[rippleId];
+            let mag = mags[rippleId];
             // We scale by integers rather than a floating point scalar for efficiency
             let a = ((max_mag - mag) * GLOBAL_ALPHA_SCALE_NUMER) / (max_mag * GLOBAL_ALPHA_SCALE_DENOM);
             ctx.beginPath();
