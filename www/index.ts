@@ -32,7 +32,7 @@ const addDroplet = (e: MouseEvent) => {
     if (mouseDown) {
         currColor = Math.trunc(Math.random() * 0xFFFFFF);
         currFreq = Math.random() * 50 + 20;
-        currMagnitude = Math.random() * 200 + 100;
+        currMagnitude = Math.random() * 100 + 50;
         pond.add_droplet(e.offsetX, e.offsetY, currMagnitude, currColor, currFreq);
     }
 };
