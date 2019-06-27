@@ -10,7 +10,7 @@ To run Ripples, you'll need the following:
 ## Building
 To compile the Rust code to wasm: `wasm-pack build` from the root directory.
 
-To start the frontend dev server: `npm start`.
+To start the frontend dev server: `npm start` from the [www](www) directory.
 
 You can see the application by visiting [localhost:8080](localhost:8080).
 Click and drag to see ripples!
