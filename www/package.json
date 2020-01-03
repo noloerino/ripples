@@ -12,6 +12,7 @@
     "url": ""
   },
   "dependencies": {
+    "color-scheme": "^1.0.1",
     "ripples": "file:../pkg"
   },
   "license": "MIT",

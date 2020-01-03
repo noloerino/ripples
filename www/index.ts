@@ -1,5 +1,6 @@
 import { Pond, init } from "ripples";
 import { memory } from "ripples/ripples_bg";
+import ColorScheme from "color-scheme";
 
 init();
 
@@ -27,10 +28,25 @@ let currColor = 0x08FF; // TODO lift state
 let currMagnitude = 200;
 let currFreq = 50;
 
+let colors = (new ColorScheme).from_hue(300)
+    .scheme("analogic")
+    .variation("pastel")
+    .colors()
+    .map(it => "0x" + it);
+
+const colorIter = function* () {
+    while (true) {
+        for (let str of colors) {
+            yield parseInt(str);
+        }
+    }
+}();
+
 let mouseDown = false;
 const addDroplet = (e: MouseEvent) => {
     if (mouseDown) {
-        currColor = Math.trunc(Math.random() * 0xFFFFFF);
+        // currColor = Math.trunc(Math.random() * 0xFFFFFF);
+        currColor = colorIter.next().value;
         currFreq = Math.random() * 50 + 20;
         currMagnitude = Math.random() * 100 + 50;
         pond.add_droplet(e.offsetX, e.offsetY, currMagnitude, currColor, currFreq);
