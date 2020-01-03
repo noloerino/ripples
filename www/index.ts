@@ -1,5 +1,7 @@
 import { Pond, init } from "ripples";
 import { memory } from "ripples/ripples_bg";
+import seedrandom from "seedrandom";
+import randomColor from "randomcolor";
 
 init();
 
@@ -7,7 +9,7 @@ const HEIGHT = window.innerHeight;
 const WIDTH = window.innerWidth;
 
 // Scales by 0.6, but reduces floating point ops in a tight loop
-const GLOBAL_ALPHA_SCALE_NUMER = 3;
+const GLOBAL_ALPHA_SCALE_NUMER = 4;//1;
 const GLOBAL_ALPHA_SCALE_DENOM = 5;
 
 const pond = Pond.new(WIDTH, HEIGHT);
@@ -23,19 +25,33 @@ const renderLoop = () => {
     requestAnimationFrame(renderLoop);
 };
 
+const rng = seedrandom("aldf");
 let currColor = 0x08FF; // TODO lift state
 let currMagnitude = 200;
 let currFreq = 50;
 
-let mouseDown = false;
-const addDroplet = (e: MouseEvent) => {
-    if (mouseDown) {
-        currColor = Math.trunc(Math.random() * 0xFFFFFF);
-        currFreq = Math.random() * 50 + 20;
-        currMagnitude = Math.random() * 100 + 50;
-        pond.add_droplet(e.offsetX, e.offsetY, currMagnitude, currColor, currFreq);
+// const hues = ["red", "orange", "blue", "green", "purple", "pink"];
+// const hues = ["red", "orange", "yellow"];
+const colorIter = function* () {
+    while (true) {
+        // let hue = hues[Math.trunc(rng() * hues.length)];
+        yield parseInt("0x" + randomColor({
+            seed: Math.trunc(rng() * 0xFFFFFF),
+            // hue: hue,
+            luminosity: "bright"
+        }).substr(1));
     }
-};
+}();
+
+const addDroplet = (x: number, y: number) => {
+    // currFreq = rng() * 50 + 10;
+    // currMagnitude = rng() * 200 + 150;
+    rng(); rng();
+    currFreq = 40;
+    currMagnitude = 200;
+    currColor = colorIter.next().value;
+    pond.add_droplet(x, y, currMagnitude, currColor, currFreq);
+}
 
 const TAU = 2 * Math.PI;
 
@@ -69,7 +85,7 @@ const drawPond = () => {
             ctx.arc(
                 xs[i],
                 ys[i],
-                mag,
+                mag * 0.1,
                 0,
                 TAU,
                 false
@@ -79,12 +95,33 @@ const drawPond = () => {
     }
 };
 
+// === Interactivity ===
+let mouseDown = false;
+let mmCtr = 0;
 canvas.addEventListener("mousedown", (e) => {
     mouseDown = e.button === 0;
-    addDroplet(e);
+    mmCtr = 0;
+    if (mouseDown) {
+        addDroplet(e.offsetX, e.offsetY);
+    }
 });
-canvas.addEventListener("mousemove", addDroplet);
+// Prevents circles from being drawn too close together when the mouse is held down
+const HOLD_INTERVAL = 3; //10;
+canvas.addEventListener("mousemove", (e) => {
+    if (mouseDown && mmCtr++ % HOLD_INTERVAL === HOLD_INTERVAL - 1) {
+        addDroplet(e.offsetX, e.offsetY);
+    }
+});
 canvas.addEventListener("mouseup", (e) => mouseDown = mouseDown && !(e.button === 0));
 
+// Pauses
+window.addEventListener("keydown", (e) => {
+    switch (e.code) {
+        case "Space":
+            pond.toggle_pause();
+    }
+});
+
+// === Initialization === 
 drawPond();
 requestAnimationFrame(renderLoop);

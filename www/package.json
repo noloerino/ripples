@@ -12,7 +12,11 @@
     "url": ""
   },
   "dependencies": {
-    "ripples": "file:../pkg"
+    "@types/randomcolor": "^0.5.3",
+    "@types/seedrandom": "^2.4.28",
+    "randomcolor": "^0.5.4",
+    "ripples": "file:../pkg",
+    "seedrandom": "^3.0.5"
   },
   "license": "MIT",
   "devDependencies": {
