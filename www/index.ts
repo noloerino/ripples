@@ -1,5 +1,8 @@
+import seedrandom from "seedrandom";
+import randomColor from "randomcolor";
 import { Pond, init } from "ripples";
 import { memory } from "ripples/ripples_bg";
+import params from "./params.json";
 
 init();
 
@@ -7,7 +10,7 @@ const HEIGHT = window.innerHeight;
 const WIDTH = window.innerWidth;
 
 // Scales by 0.6, but reduces floating point ops in a tight loop
-const GLOBAL_ALPHA_SCALE_NUMER = 3;
+const GLOBAL_ALPHA_SCALE_NUMER = 1;
 const GLOBAL_ALPHA_SCALE_DENOM = 5;
 
 const pond = Pond.new(WIDTH, HEIGHT);
@@ -17,24 +20,34 @@ canvas.width = WIDTH;
 
 const ctx = canvas.getContext("2d");
 
-const renderLoop = () => {
+const interactiveRenderLoop = () => {
     pond.tick();
     drawPond();
-    requestAnimationFrame(renderLoop);
+    requestAnimationFrame(interactiveRenderLoop);
 };
 
+const rng = seedrandom("aldf");
 let currColor = 0x08FF; // TODO lift state
 let currMagnitude = 200;
 let currFreq = 50;
 
-let mouseDown = false;
-const addDroplet = (e: MouseEvent) => {
-    if (mouseDown) {
-        currColor = Math.trunc(Math.random() * 0xFFFFFF);
-        currFreq = Math.random() * 50 + 20;
-        currMagnitude = Math.random() * 100 + 50;
-        pond.add_droplet(e.offsetX, e.offsetY, currMagnitude, currColor, currFreq);
+const colorIter = function* () {
+    while (true) {
+        yield parseInt("0x" + randomColor({
+            seed: Math.trunc(rng() * 0xFFFFFF),
+            hue: "blue",
+            luminosity: "bright"
+        }).substr(1));
     }
+}();
+
+const freqScale = params.freqMax - params.freqMin;
+const magScale = params.magMax - params.magMin;
+const addDroplet = (x: number, y: number) => {
+    currFreq = rng() * freqScale + params.freqMin;
+    currMagnitude = rng() * magScale + params.magMin;
+    currColor = colorIter.next().value;
+    pond.add_droplet(x, y, currMagnitude, currColor, currFreq);
 };
 
 const TAU = 2 * Math.PI;
@@ -79,12 +92,109 @@ const drawPond = () => {
     }
 };
 
-canvas.addEventListener("mousedown", (e) => {
-    mouseDown = e.button === 0;
-    addDroplet(e);
-});
-canvas.addEventListener("mousemove", addDroplet);
-canvas.addEventListener("mouseup", (e) => mouseDown = mouseDown && !(e.button === 0));
 
+// === Interactivity ===
+const enableInteractive = () => {
+    let mouseDown = false;
+    let mmCtr = 0;
+    canvas.addEventListener("mousedown", (e) => {
+        mouseDown = e.button === 0;
+        mmCtr = 0;
+        if (mouseDown) {
+            addDroplet(e.offsetX, e.offsetY);
+        }
+    });
+    // Prevents circles from being drawn too close together when the mouse is held down
+    const HOLD_INTERVAL = 10;
+    canvas.addEventListener("mousemove", (e) => {
+        if (mouseDown && mmCtr++ % HOLD_INTERVAL === HOLD_INTERVAL - 1) {
+            addDroplet(e.offsetX, e.offsetY);
+        }
+    });
+    canvas.addEventListener("mouseup", (e) => mouseDown = mouseDown && !(e.button === 0));
+
+    // Pauses
+    window.addEventListener("keydown", (e) => {
+        switch (e.code) {
+            case "Space":
+                pond.toggle_pause();
+        }
+    });
+};
+
+let renderLoop = interactiveRenderLoop;
+
+// Autodraw
+if (params.autodraw.active) {
+    console.log("Detected autodraw configuration; interactivity disabled");
+    let {
+        stopFrame, // Number of frames to linger after last thing drawn until pause
+        circlesPerFrame,
+        xStartOffs,
+        xEndOffs,
+        yStartOffs,
+        yEndOffs,
+        xSpread,
+        ySpread,
+        xStep,
+        yStep,
+    } = params.autodraw;
+
+    /*
+    // After the circles are drawn, wait for some amount of frames
+    let waitCountdown = stopFrame;
+    const waitRenderLoop = () => {
+        pond.tick();
+        drawPond();
+        if (--waitCountdown == 0) {
+            // Pause the animation and begin interactivity
+            pond.toggle_pause();
+            requestAnimationFrame(interactiveRenderLoop);
+        } else {
+            requestAnimationFrame(waitRenderLoop);
+        }
+    };
+    */
+    // Allow negative random displacements
+    let xShift = xSpread / 2, yShift = ySpread / 2;
+    let currX = xStartOffs, currY = yStartOffs;
+    // Draw circles somewhat randomly according to the parameters
+    const autoRenderLoop = () => {
+        // Draw a column of up to circlesPerFrame circles
+        for (let i = 0; i < circlesPerFrame; i++) {
+            if (currY > HEIGHT + yEndOffs) {
+                break;
+            }
+            let offsX = rng() * xSpread - xShift;
+            let offsY = rng() * ySpread - yShift;
+            addDroplet(currX + offsX, currY + offsY);
+            currY += yStep;
+        }
+        // Move on to next row if we've exceeded bounds
+        // This check cannot be raised to the for loop in case we end up exceeding
+        // with the last iter of the loop
+        // (it's not a perf bottleneck anyway)
+        if (currY > HEIGHT + yEndOffs) {
+            currY = 0;
+            currX += xStep;
+        }
+        pond.tick();
+        drawPond();
+        if (currX > WIDTH + xEndOffs) {
+            console.log(`Completed autodraw (last coordinate x=${currX}, y=${currY})`);
+            console.log("Reenabling interactivity");
+            // requestAnimationFrame(waitRenderLoop);
+            requestAnimationFrame(interactiveRenderLoop);
+        } else {
+            requestAnimationFrame(autoRenderLoop);
+        }
+    };
+    // Update the global render loop
+    renderLoop = autoRenderLoop;
+}
+
+enableInteractive();
+
+// === Initialization ===
 drawPond();
 requestAnimationFrame(renderLoop);

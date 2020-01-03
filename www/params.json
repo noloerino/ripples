@@ -1,0 +1,19 @@
+{
+    "freqMin": 10,
+    "freqMax": 60,
+    "magMin": 150,
+    "magMax": 350,
+    "autodraw": {
+        "active": true,
+        "stopFrame": 200,
+        "circlesPerFrame": 10,
+        "xStartOffs": -5,
+        "xEndOffs": 200,
+        "yStartOffs": -5,
+        "yEndOffs": 50,
+        "xSpread": 50,
+        "ySpread": 30,
+        "xStep": 50,
+        "yStep": 50
+    }
+}
