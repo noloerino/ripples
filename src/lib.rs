@@ -1,20 +1,6 @@
 mod utils;
 
 use wasm_bindgen::prelude::*;
-use web_sys;
-
-// When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.
-#[cfg(feature = "wee_alloc")]
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
-// From the wasm game of life tutorial:
-// A macro to provide `println!(..)`-style syntax for `console.log` logging.
-macro_rules! log {
-    ( $( $t:tt )* ) => {
-        web_sys::console::log_1(&format!( $( $t )* ).into());
-    }
-}
 
 type Coordinate = u16;
 type DropletStrength = u16;
@@ -72,6 +58,7 @@ pub struct Pond {
     width: Coordinate,
     height: Coordinate,
     droplets: Droplets,
+    paused: bool,
 }
 
 #[wasm_bindgen]
@@ -81,12 +68,16 @@ impl Pond {
             width,
             height,
             droplets: Droplets::new(),
+            paused: false,
         }
     }
 
     /// Updates the pond by generating new ripples, and removing olds ripples
     /// and droplets that have run out of inertia.
     pub fn tick(&mut self) {
+        if self.paused {
+            return;
+        }
         // Add fresh ripples, and remove dead droplets at the same time
         let Droplets {
             xs,
@@ -225,6 +216,10 @@ impl Pond {
 
     pub fn total_ripples(&self) -> u32 {
         self.droplets.total_ripples
+    }
+
+    pub fn toggle_pause(&mut self) {
+        self.paused = !self.paused;
     }
 }
 
