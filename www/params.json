@@ -3,17 +3,18 @@
     "freqMax": 60,
     "magMin": 150,
     "magMax": 350,
+    "backgroundColor": "black",
     "autodraw": {
-        "active": true,
+        "active": false,
         "stopFrame": 200,
         "circlesPerFrame": 10,
-        "xStartOffs": -5,
-        "xEndOffs": 200,
-        "yStartOffs": -5,
-        "yEndOffs": 50,
+        "xStartOffs": -400,
+        "xEndOffs": 400,
+        "yStartOffs": -400,
+        "yEndOffs": 400,
+        "xStep": 70,
+        "yStep": 70,
         "xSpread": 50,
-        "ySpread": 30,
-        "xStep": 50,
-        "yStep": 50
+        "ySpread": 30
     }
 }

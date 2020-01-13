@@ -9,9 +9,9 @@ init();
 const HEIGHT = window.innerHeight;
 const WIDTH = window.innerWidth;
 
-// Scales by 0.6, but reduces floating point ops in a tight loop
+// Scales the alpha by this fraction
 const GLOBAL_ALPHA_SCALE_NUMER = 1;
-const GLOBAL_ALPHA_SCALE_DENOM = 5;
+const GLOBAL_ALPHA_SCALE_DENOM = 15; 
 
 const pond = Pond.new(WIDTH, HEIGHT);
 const canvas = <HTMLCanvasElement> document.getElementById("pond-canvas");
@@ -20,13 +20,32 @@ canvas.width = WIDTH;
 
 const ctx = canvas.getContext("2d");
 
+var animHandle: number;
+var paused = false;
+const togglePause = () => {
+    if (paused) {
+        console.log("Unpaused.");
+        animHandle = requestAnimationFrame(interactiveRenderLoop);
+    } else {
+        console.log("Paused.");
+        cancelAnimationFrame(animHandle);
+    }
+    paused = !paused;
+};
+
 const interactiveRenderLoop = () => {
     pond.tick();
     drawPond();
-    requestAnimationFrame(interactiveRenderLoop);
+    animHandle = requestAnimationFrame(interactiveRenderLoop);
 };
 
-const rng = seedrandom("aldf");
+var seed = "aldf";
+if (params.backgroundColor) {
+  canvas.style.backgroundColor = params.backgroundColor;
+  seed = params.backgroundColor;
+}
+
+const rng = seedrandom(seed);
 let currColor = 0x08FF; // TODO lift state
 let currMagnitude = 200;
 let currFreq = 50;
@@ -94,6 +113,7 @@ const drawPond = () => {
 
 
 // === Interactivity ===
+
 const enableInteractive = () => {
     let mouseDown = false;
     let mmCtr = 0;
@@ -105,7 +125,7 @@ const enableInteractive = () => {
         }
     });
     // Prevents circles from being drawn too close together when the mouse is held down
-    const HOLD_INTERVAL = 10;
+    const HOLD_INTERVAL = 5;
     canvas.addEventListener("mousemove", (e) => {
         if (mouseDown && mmCtr++ % HOLD_INTERVAL === HOLD_INTERVAL - 1) {
             addDroplet(e.offsetX, e.offsetY);
@@ -117,7 +137,7 @@ const enableInteractive = () => {
     window.addEventListener("keydown", (e) => {
         switch (e.code) {
             case "Space":
-                pond.toggle_pause();
+                togglePause();
         }
     });
 };
@@ -126,7 +146,7 @@ let renderLoop = interactiveRenderLoop;
 
 // Autodraw
 if (params.autodraw.active) {
-    console.log("Detected autodraw configuration; interactivity disabled");
+    console.log("Detected autodraw configuration; interactivity disabled.");
     let {
         stopFrame, // Number of frames to linger after last thing drawn until pause
         circlesPerFrame,
@@ -140,7 +160,10 @@ if (params.autodraw.active) {
         yStep,
     } = params.autodraw;
 
-    /*
+    // Allow drawing off screen
+    // canvas.height += yEndOffs;
+    // canvas.width += xEndOffs;
+
     // After the circles are drawn, wait for some amount of frames
     let waitCountdown = stopFrame;
     const waitRenderLoop = () => {
@@ -148,45 +171,37 @@ if (params.autodraw.active) {
         drawPond();
         if (--waitCountdown == 0) {
             // Pause the animation and begin interactivity
-            pond.toggle_pause();
-            requestAnimationFrame(interactiveRenderLoop);
+            togglePause();
         } else {
-            requestAnimationFrame(waitRenderLoop);
+            animHandle = requestAnimationFrame(waitRenderLoop);
         }
     };
-    */
     // Allow negative random displacements
     let xShift = xSpread / 2, yShift = ySpread / 2;
     let currX = xStartOffs, currY = yStartOffs;
     // Draw circles somewhat randomly according to the parameters
     const autoRenderLoop = () => {
-        // Draw a column of up to circlesPerFrame circles
+        // Draw up to circlesPerFrame circles
         for (let i = 0; i < circlesPerFrame; i++) {
             if (currY > HEIGHT + yEndOffs) {
-                break;
+                // Move on to next column
+                currY = yStartOffs;
+                currX += xStep;
             }
             let offsX = rng() * xSpread - xShift;
             let offsY = rng() * ySpread - yShift;
             addDroplet(currX + offsX, currY + offsY);
             currY += yStep;
         }
-        // Move on to next row if we've exceeded bounds
-        // This check cannot be raised to the for loop in case we end up exceeding
-        // with the last iter of the loop
-        // (it's not a perf bottleneck anyway)
-        if (currY > HEIGHT + yEndOffs) {
-            currY = 0;
-            currX += xStep;
-        }
         pond.tick();
         drawPond();
         if (currX > WIDTH + xEndOffs) {
             console.log(`Completed autodraw (last coordinate x=${currX}, y=${currY})`);
-            console.log("Reenabling interactivity");
-            // requestAnimationFrame(waitRenderLoop);
-            requestAnimationFrame(interactiveRenderLoop);
+            // console.log("Reenabling interactivity");
+            animHandle = requestAnimationFrame(waitRenderLoop);
+            // requestAnimationFrame(interactiveRenderLoop);
         } else {
-            requestAnimationFrame(autoRenderLoop);
+            animHandle = requestAnimationFrame(autoRenderLoop);
         }
     };
     // Update the global render loop
@@ -197,4 +212,4 @@ enableInteractive();
 
 // === Initialization ===
 drawPond();
-requestAnimationFrame(renderLoop);
+animHandle = requestAnimationFrame(renderLoop);
