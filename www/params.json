@@ -3,7 +3,8 @@
     "freqMax": 60,
     "magMin": 150,
     "magMax": 350,
-    "backgroundColor": "white",
+    "hue": "random",
+    "backgroundColor": "rgba(1,0,1,0.20)",
     "autodraw": {
         "active": false,
         "stopFrame": 200,

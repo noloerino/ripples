@@ -54,7 +54,7 @@ const colorIter = function* () {
     while (true) {
         yield parseInt("0x" + randomColor({
             seed: Math.trunc(rng() * 0xFFFFFF),
-            hue: "blue",
+            hue: params.hue,
             luminosity: "bright"
         }).substr(1));
     }
@@ -125,7 +125,7 @@ const enableInteractive = () => {
         }
     });
     // Prevents circles from being drawn too close together when the mouse is held down
-    const HOLD_INTERVAL = 5;
+    const HOLD_INTERVAL = 3;
     canvas.addEventListener("mousemove", (e) => {
         if (mouseDown && mmCtr++ % HOLD_INTERVAL === HOLD_INTERVAL - 1) {
             addDroplet(e.offsetX, e.offsetY);

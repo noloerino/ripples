@@ -1,6 +1,7 @@
 # Ripples
 My personal desktop background generator.
 
+![Manual Example](sample/hand_sample.png)
 ![Autodraw Example](sample/auto_sample.png)
 
 ## Setup
@@ -19,6 +20,7 @@ Click and drag to see ripples! Press the spacebar to toggle pause.
 
 ## Configuring
 You'll find a configuration file under `www/params.json`. Here's an explanation of what each field does:
+- `hue`: A base hue to use for random colors. See `randomcolor`'s [documentation](https://www.npmjs.com/package/randomcolor) for details.
 - `freqMin` and `freqMax`: The "frequency" of a ripple is how many frames it takes for a new circle to appear. Each ripple will have a random frequency between `freqMin` and `freqMax`.
 - `magMin` and `magMax`: The "magnitude" of a ripple is how large its circle becomes. Each ripple has a random magnitude between `magMin` and `magMax`.
 - `backgroundColor`: A color string representing the color of the background of the canvas.
