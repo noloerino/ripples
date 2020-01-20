@@ -51,7 +51,8 @@ The 24 different background colors were created by messing around with the [pale
 - 3 `rgba( 53,  2, 71,1)`
 - 4 `rgba( 84, 13,  0,1)`
 - 5 `rgba(107, 39,  0,1)`
-- //
+- 6 with luck, I'm not awake at 6 or 7 AM
+- 7 not that I'm awake at 3, 4, or 5 AM either, but I generated too many colors
 - 8 `rgba(255,190,183,1)`
 - 9 `rgba(200,163,185,1)`
 - 10 `rgba(160,132,186,1)`
